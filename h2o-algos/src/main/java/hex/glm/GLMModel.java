@@ -19,6 +19,7 @@ import water.udf.CFuncRef;
 import water.util.*;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.NoSuchElementException;
@@ -1087,6 +1088,17 @@ public class GLMModel extends Model<GLMModel,GLMModel.GLMParameters,GLMModel.GLM
     double [][] _vcov;
     private double _dispersion;
     private boolean _dispersionEstimated;
+    public ScoreKeeper[] _scored_train;
+    public ScoreKeeper[] _scored_valid;
+    public ScoreKeeper[] _scored_xval;
+    public ScoreKeeper[] scoreKeepers() {
+      ArrayList<ScoreKeeper> skl = new ArrayList<>();
+      ScoreKeeper[] ska = _validation_metrics != null ? _scored_valid : (_cross_validation_metrics != null? _scored_xval:_scored_train);
+      for (ScoreKeeper sk : ska)
+        if (!sk.isEmpty())
+          skl.add(sk);
+      return skl.toArray(new ScoreKeeper[skl.size()]);
+    }
     
     public boolean hasPValues(){return _zvalues != null;}
     public double [] stdErr(){
@@ -1183,6 +1195,9 @@ public class GLMModel extends Model<GLMModel,GLMModel.GLMParameters,GLMModel.GLM
       else
         _global_beta=beta;
       _submodels = new Submodel[]{new Submodel(0,beta,-1,Double.NaN,Double.NaN)};
+      _scored_train = new ScoreKeeper[]{new ScoreKeeper(Double.NaN)};
+      _scored_valid = new ScoreKeeper[]{new ScoreKeeper(Double.NaN)};
+      _scored_xval = new ScoreKeeper[]{new ScoreKeeper(Double.NaN)};
     }
     
     public GLMOutput() {_isSupervised = true; _nclasses = -1;}
@@ -1234,7 +1249,9 @@ public class GLMModel extends Model<GLMModel,GLMModel.GLMParameters,GLMModel.GLM
       _nclasses = glm.nclasses();
       _multinomial = glm._parms._family == Family.multinomial;
       _ordinal = (glm._parms._family == Family.ordinal);
-
+      _scored_train = new ScoreKeeper[]{new ScoreKeeper(Double.NaN)};
+      _scored_valid = new ScoreKeeper[]{new ScoreKeeper(Double.NaN)};
+      _scored_xval = new ScoreKeeper[]{new ScoreKeeper(Double.NaN)};
     }
 
     /**

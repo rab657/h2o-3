@@ -2009,8 +2009,10 @@ public class GLM extends ModelBuilder<GLMModel,GLMParameters,GLMOutput> {
     private void scoreEnd(Frame train, long t1) {
       ModelMetrics mtrain = ModelMetrics.getFromDKV(_model, train); // updated by model.scoreAndUpdateModel
       long t2 = System.currentTimeMillis();
+      _model._output._scoring_history = _parms._lambda_search?_lsc.to2dTable():(_parms._HGLM?_sc.to2dTableHGLM():_sc.to2dTable());
       if (!(mtrain == null)) {
         _model._output._training_metrics = mtrain;
+        _model._output._scored_train[_model._output._scoring_history.getRowDim()].fillFrom(mtrain);
         Log.info(LogMsg(mtrain.toString()));
       } else {
         Log.info(LogMsg("ModelMetrics mtrain is null"));
@@ -2020,8 +2022,9 @@ public class GLM extends ModelBuilder<GLMModel,GLMParameters,GLMOutput> {
         Frame valid = DKV.<Frame>getGet(_parms._valid);
         _model.score(valid).delete();
         _model._output._validation_metrics = ModelMetrics.getFromDKV(_model, valid); //updated by model.scoreAndUpdateModel
+        _model._output._scored_valid[_model._output._scoring_history.getRowDim()].fillFrom(_model._output._validation_metrics);
       }
-      _model._output._scoring_history = _parms._lambda_search?_lsc.to2dTable():(_parms._HGLM?_sc.to2dTableHGLM():_sc.to2dTable());
+
       _model.update(_job._key);
       if (_parms._HGLM)
         _model.generateSummaryHGLM(_parms._train,_state._iter);
@@ -2030,6 +2033,7 @@ public class GLM extends ModelBuilder<GLMModel,GLMParameters,GLMOutput> {
       _lastScore = System.currentTimeMillis();
       long scoringTime = System.currentTimeMillis() - t1;
       _scoringInterval = Math.max(_scoringInterval,20*scoringTime); // at most 5% overhead for scoring
+      
     }
 
     protected Submodel computeSubmodel(int i,double lambda) {
@@ -2083,6 +2087,8 @@ public class GLM extends ModelBuilder<GLMModel,GLMParameters,GLMOutput> {
 
     private transient double _nullDevTrain = Double.NaN;
     private transient double _nullDevTest = Double.NaN;
+    private boolean _earlyStop = false;  // set by earlyStopping
+    
     @Override
     public void computeImpl() {
       if(_doInit)
@@ -2145,7 +2151,7 @@ public class GLM extends ModelBuilder<GLMModel,GLMParameters,GLMOutput> {
         updateProgress(false);
       // lambda search loop
       for (int i = 0; i < _parms._lambda.length; ++i) {  // lambda search
-        if (_job.stop_requested() || (timeout() && _model._output._submodels.length > 0)) break;  //need at least one submodel on timeout to avoid issues.
+        if (_job.stop_requested() || (timeout() && _model._output._submodels.length > 0) || _earlyStop) break;  //need at least one submodel on timeout to avoid issues.
         if(_parms._max_iterations != -1 && _state._iter >= _parms._max_iterations) break;
         Submodel sm = computeSubmodel(i,_parms._lambda[i]);
         double trainDev = sm.devianceTrain;
@@ -2176,9 +2182,11 @@ public class GLM extends ModelBuilder<GLMModel,GLMParameters,GLMOutput> {
         }
         _job.update(_workPerIteration,"iter=" + _state._iter + " lmb=" + lambdaFormatter.format(_state.lambda()) + "deviance trn/tst= " + devFormatter.format(trainDev) + "/" + devFormatter.format(testDev) + " P=" + ArrayUtils.countNonzeros(_state.beta()));
       }
-      if (stop_requested()) {
+      if (stop_requested() || _earlyStop) {
         if (timeout()) {
           Log.info("Stopping GLM training because of timeout");
+        } else if (_earlyStop) {
+          Log.info("Stopping GLM training due to hitting earlyStopping criteria.");
         } else {
           throw new Job.JobCancelledException();
         }
@@ -2260,7 +2268,7 @@ public class GLM extends ModelBuilder<GLMModel,GLMParameters,GLMOutput> {
         _state.updateState(beta, gginfo);
         if (!_parms._lambda_search)
           updateProgress(false);
-        return !stop_requested() && _state._iter < _parms._max_iterations;
+        return !stop_requested() && _state._iter < _parms._max_iterations && !_earlyStop;
       } else {
         GLMGradientInfo gginfo = (GLMGradientInfo) ginfo;
         if(gginfo._gradient == null)
@@ -2271,7 +2279,7 @@ public class GLM extends ModelBuilder<GLMModel,GLMParameters,GLMOutput> {
           updateProgress(true);
         boolean converged = _state.converged();
         if (converged) Log.info(LogMsg(_state.convergenceMsg));
-        return !stop_requested() && !converged && _state._iter < _parms._max_iterations;
+        return !stop_requested() && !converged && _state._iter < _parms._max_iterations && !_earlyStop;
       }
     }
 
@@ -2286,7 +2294,7 @@ public class GLM extends ModelBuilder<GLMModel,GLMParameters,GLMOutput> {
           updateProgress(fixedModel, randModels, glmmmeReturns, hvDataOnly, VC1, VC2, sumDiff2,
                   sumDiff2 / sumeta2, true, cholR, augZ);
       }
-      return !stop_requested() && !converged && (iteration < _parms._max_iterations);
+      return !stop_requested() && !converged && (iteration < _parms._max_iterations) && !_earlyStop;
     }
     
     public boolean progress(double [] beta, double likelihood) {
@@ -2296,7 +2304,7 @@ public class GLM extends ModelBuilder<GLMModel,GLMParameters,GLMOutput> {
         updateProgress(true);
       boolean converged = _state.converged();
       if(converged) Log.info(LogMsg(_state.convergenceMsg));
-      return !stop_requested() && !converged && _state._iter < _parms._max_iterations ;
+      return !stop_requested() && !converged && _state._iter < _parms._max_iterations && !_earlyStop;
     }
 
     private transient long _scoringInterval = SCORING_INTERVAL_MSEC;
@@ -2309,6 +2317,16 @@ public class GLM extends ModelBuilder<GLMModel,GLMParameters,GLMOutput> {
         _model.update(_state.expandBeta(_state.beta()), _state.ubeta(),-1, -1, _state._iter);
         scoreAndUpdateModelHGLM(fixedModel, randModels, glmmmeReturns, hvDataOnly, VC1, VC2, sumDiff2, convergence, 
                 cholR, augXZ, false);
+        _earlyStop = !_earlyStop?ScoreKeeper.stopEarly(_model._output.scoreKeepers(),
+                _parms._stopping_rounds, ScoreKeeper.ProblemType.forSupervised(_nclass > 1), _parms._stopping_metric,
+                _parms._stopping_tolerance, "model's last", true):_earlyStop;
+        if (!_earlyStop) {
+          _model._output._scored_train = ArrayUtils.copyAndFillOf(_model._output._scored_train,
+                  _model._output._scoring_history.getRowDim() + 1, new ScoreKeeper());
+          _model._output._scored_valid = _model._output._scored_valid != null ?
+                  ArrayUtils.copyAndFillOf(_model._output._scored_valid, _model._output._scoring_history.getRowDim() + 1,
+                          new ScoreKeeper()) : null;
+        }
       }
     }
     // update user visible progress

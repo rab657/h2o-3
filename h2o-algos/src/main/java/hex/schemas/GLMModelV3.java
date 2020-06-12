@@ -6,7 +6,6 @@ import water.MemoryManager;
 import water.api.API;
 import water.api.schemas3.ModelOutputSchemaV3;
 import water.api.schemas3.ModelSchemaV3;
-
 import water.api.schemas3.TwoDimTableV3;
 import water.util.ArrayUtils;
 import water.util.TwoDimTable;
@@ -24,6 +23,9 @@ public class GLMModelV3 extends ModelSchemaV3<GLMModel, GLMModelV3, GLMModel.GLM
 
     @API(help="Table of Random Coefficients for HGLM")
     TwoDimTableV3 random_coefficients_table;
+
+    @API(help="Table of Scoring History for Early Stop")
+    TwoDimTableV3 scoring_history_early_stop;
 
     @API(help="Table of Coefficients with coefficients denoted with class names for GLM multinonimals only.")
     TwoDimTableV3 coefficients_table_multinomials_with_class_names;  // same as coefficients_table but with real class names.
@@ -155,6 +157,9 @@ public class GLMModelV3 extends ModelSchemaV3<GLMModel, GLMModelV3, GLMModel.GLM
       lambda_1se = impl.lambda_1se();
       lambda_best = impl.lambda_best();
       dispersion = impl.dispersion();
+
+ //     scoring_history_early_stop = createScoringHistoryTable(ScoringInfo[] scoringInfos, boolean hasValidation, _parms._nfolds>1, ModelCategory modelCategory, false);
+      
       if(impl._multinomial || impl._ordinal)
         return fillMultinomial(impl);
       String [] names = impl.coefficientNames().clone();

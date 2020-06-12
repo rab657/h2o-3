@@ -69,6 +69,9 @@ public class GLMV3 extends ModelBuilderSchema<GLM,GLMV3,GLMV3.GLMParametersV3> {
             "interaction_pairs",
             "obj_reg",
             "export_checkpoints_dir",
+             "stopping_rounds",
+             "stopping_metric",
+             "stopping_tolerance",
             // dead unused args forced here by backwards compatibility, remove in V4
             "balance_classes",
             "class_sampling_factors",
