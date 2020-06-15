@@ -508,6 +508,10 @@ public class GLM extends ModelBuilder<GLMModel,GLMParameters,GLMOutput> {
     }
     if (expensive) {
       if (error_count() > 0) return;
+      if (_parms._lambda_search && (_parms._stopping_rounds > 0)) {
+        warn("early stop", "disabled when lambda_search=true.");
+        _parms._stopping_rounds = 0;  // set stopping_round = 0 to disable early stopping
+      }
       if (_parms._alpha == null)
         _parms._alpha = new double[]{_parms._solver == Solver.L_BFGS ? 0 : .5};
       if (_parms._lambda_search  &&_parms._nlambdas == -1)

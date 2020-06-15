@@ -21,9 +21,9 @@ def test_glm_earlyStop():
     h2o_data["C4"] = h2o_data["C4"].asfactor()
     h2o_data["C5"] = h2o_data["C5"].asfactor()
     h2o_data["C11"] = h2o_data["C11"].asfactor()
-    splits_frames = h2o.splitFrame(data =  h2o_data, ratios = .8, seed = 1234)
-    train = splits_frames[[1]]
-    valid = splits_frames[[2]]
+    splits <- h2o.splitFrame(data =  h2o_data, ratios = .8, seed = 1234)
+    train <- splits[[1]]
+    valid <- splits[[2]]
     
     print("Start earlying stopping test")
     h2o_model_no_early_stop = glm(family="multinomial")
@@ -35,11 +35,7 @@ def test_glm_earlyStop():
         h2o_model2 = glm(family="multinomial", stopping_rounds=max_stopping_rounds, score_iteration_interval=1,
                         stopping_metric=early_stop_metrics[ind], stopping_tolerance=max_tolerance)
         h2o_model2.train(x=[0,1,2,3,4,5,6,7,8,9], y="C11", training_frame=h2o_data)
-        h2o_model2 = glm(family="multinomial", stopping_rounds=max_stopping_rounds, score_iteration_interval=1,
-                         stopping_metric=early_stop_metrics[ind], stopping_tolerance=max_tolerance)
-    h2o_model2.train(x=[0,1,2,3,4,5,6,7,8,9], y="C11", training_frame=h2o_data)
-        assert h2o_model.coeff()==h2o_model2.coeff() # should provide the same model
-        print("Checking if early stopping has been done correctly.")
+        assert h2o_model.coeff()==h2o_model2.coeff()
         print("Done")
         
         
