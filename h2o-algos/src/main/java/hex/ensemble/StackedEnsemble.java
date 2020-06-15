@@ -329,7 +329,7 @@ public class StackedEnsemble extends ModelBuilder<StackedEnsembleModel,StackedEn
                 " but must be one of " + Arrays.toString(Metalearner.Algorithm.values()));
       }
       if (_model._parms._evaluate_auto && _model._parms._metalearner_algorithm == Metalearner.Algorithm.AUTO)
-        _model._parms._metalearner_algorithm = Metalearner.Algorithm.glm;
+        _model._parms._metalearner_algorithm = metalearnerAlgoImpl;
     } // computeImpl
   }
 
