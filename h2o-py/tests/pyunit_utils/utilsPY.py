@@ -2846,7 +2846,6 @@ def evaluate_early_stopping(metric_list, stop_round, tolerance, bigger_is_better
 
     :return:    bool indicating if we should stop early and sorted metric_list
     """
-    metric_len = len(metric_list)
     metric_list.sort(reverse=bigger_is_better)
     shortest_len = 2*stop_round
 
@@ -2888,7 +2887,6 @@ def check_and_count_models(hyper_params, params_zero_one, params_more_than_zero,
     """
 
     total_model = 1
-    param_len = 0
     hyper_keys = list(hyper_params)
     shuffle(hyper_keys)    # get all hyper_parameter names in random order
     final_hyper_params = dict()

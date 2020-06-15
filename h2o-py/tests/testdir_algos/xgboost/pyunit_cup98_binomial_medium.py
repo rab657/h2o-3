@@ -21,7 +21,8 @@ def xgboost_cup98_medium():
 
     # Model with maximum of 2 trees
     model_2_trees = H2OXGBoostEstimator(training_frame=training_frame, learn_rate=0.7,
-                                        booster='gbtree', seed=1, ntrees=2, distribution='bernoulli')
+                                        booster='gbtree', seed=1, ntrees=2, distribution='bernoulli', stopping_rounds=3,
+                                        stopping_metric="logloss", stopping_tolerance=0.01)
     model_2_trees.train(x=x, y=y, training_frame=training_frame)
     predition_2_trees = model_2_trees.predict(test_frame)
 

@@ -32,8 +32,8 @@ class H2OGeneralizedLinearEstimator(H2OEstimator):
     param_names = {"model_id", "training_frame", "validation_frame", "nfolds", "seed", "keep_cross_validation_models",
                    "keep_cross_validation_predictions", "keep_cross_validation_fold_assignment", "fold_assignment",
                    "fold_column", "response_column", "ignored_columns", "random_columns", "ignore_const_cols",
-                   "score_each_iteration", "offset_column", "weights_column", "family", "rand_family",
-                   "tweedie_variance_power", "tweedie_link_power", "theta", "solver", "alpha", "lambda_",
+                   "score_each_iteration", "score_iteration_interval", "offset_column", "weights_column", "family",
+                   "rand_family", "tweedie_variance_power", "tweedie_link_power", "theta", "solver", "alpha", "lambda_",
                    "lambda_search", "early_stopping", "nlambdas", "standardize", "missing_values_handling",
                    "plug_values", "compute_p_values", "remove_collinear_columns", "intercept", "non_negative",
                    "max_iterations", "objective_epsilon", "beta_epsilon", "gradient_epsilon", "link", "rand_link",
@@ -447,6 +447,21 @@ class H2OGeneralizedLinearEstimator(H2OEstimator):
     def score_each_iteration(self, score_each_iteration):
         assert_is_type(score_each_iteration, None, bool)
         self._parms["score_each_iteration"] = score_each_iteration
+
+
+    @property
+    def score_iteration_interval(self):
+        """
+        Perform scoring for every score_iteration_interval iterations
+
+        Type: ``int``  (default: ``-1``).
+        """
+        return self._parms.get("score_iteration_interval")
+
+    @score_iteration_interval.setter
+    def score_iteration_interval(self, score_iteration_interval):
+        assert_is_type(score_iteration_interval, None, int)
+        self._parms["score_iteration_interval"] = score_iteration_interval
 
 
     @property

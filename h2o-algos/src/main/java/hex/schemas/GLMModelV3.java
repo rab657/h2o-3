@@ -1,17 +1,24 @@
 package hex.schemas;
 
+import hex.ModelCategory;
+import hex.ScoreKeeper;
 import hex.glm.GLMModel;
 import hex.glm.GLMModel.GLMOutput;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import water.MemoryManager;
 import water.api.API;
 import water.api.schemas3.ModelOutputSchemaV3;
 import water.api.schemas3.ModelSchemaV3;
 import water.api.schemas3.TwoDimTableV3;
 import water.util.ArrayUtils;
+import water.util.PrettyPrint;
 import water.util.TwoDimTable;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.List;
 //import water.util.DocGen.HTML;
 
 public class GLMModelV3 extends ModelSchemaV3<GLMModel, GLMModelV3, GLMModel.GLMParameters, GLMV3.GLMParametersV3, GLMOutput, GLMModelV3.GLMModelOutputV3> {
@@ -25,7 +32,7 @@ public class GLMModelV3 extends ModelSchemaV3<GLMModel, GLMModelV3, GLMModel.GLM
     TwoDimTableV3 random_coefficients_table;
 
     @API(help="Table of Scoring History for Early Stop")
-    TwoDimTableV3 scoring_history_early_stop;
+    TwoDimTable scoring_history_early_stop;
 
     @API(help="Table of Coefficients with coefficients denoted with class names for GLM multinonimals only.")
     TwoDimTableV3 coefficients_table_multinomials_with_class_names;  // same as coefficients_table but with real class names.
@@ -122,7 +129,8 @@ public class GLMModelV3 extends ModelSchemaV3<GLMModel, GLMModelV3, GLMModel.GLM
           standardized_coefficient_magnitudes = new TwoDimTableV3();
           standardized_coefficient_magnitudes.fillFromImpl(tdt);
         }
-
+      scoring_history_early_stop = createScoringHistoryTable(impl, impl._validation_metrics!=null,
+              impl._cross_validation_metrics != null, impl.getModelCategory());
       return this;
     }
 
@@ -157,8 +165,6 @@ public class GLMModelV3 extends ModelSchemaV3<GLMModel, GLMModelV3, GLMModel.GLM
       lambda_1se = impl.lambda_1se();
       lambda_best = impl.lambda_best();
       dispersion = impl.dispersion();
-
- //     scoring_history_early_stop = createScoringHistoryTable(ScoringInfo[] scoringInfos, boolean hasValidation, _parms._nfolds>1, ModelCategory modelCategory, false);
       
       if(impl._multinomial || impl._ordinal)
         return fillMultinomial(impl);
@@ -239,9 +245,107 @@ public class GLMModelV3 extends ModelSchemaV3<GLMModel, GLMModelV3, GLMModel.GLM
         standardized_coefficient_magnitudes = new TwoDimTableV3();
         standardized_coefficient_magnitudes.fillFromImpl(tdt);
       }
+      scoring_history_early_stop = createScoringHistoryTable(impl, impl._validation_metrics!=null,
+              impl._cross_validation_metrics != null, impl.getModelCategory());
       return this;
     }
   } // GLMModelOutputV2
+
+// create scoring history table using scoreKeeper arrays scored_train, scored_xval, scored_valid
+  public static TwoDimTable createScoringHistoryTable(GLMOutput glmOutput, boolean hasValidation, 
+                                                      boolean hasCrossValidation, ModelCategory modelCategory) {
+    boolean isClassifier = (modelCategory == ModelCategory.Binomial || modelCategory == ModelCategory.Multinomial
+            || modelCategory == ModelCategory.Ordinal);
+    List<String> colHeaders = new ArrayList<>();
+    List<String> colTypes = new ArrayList<>();
+    List<String> colFormat = new ArrayList<>();
+    colHeaders.add("Timestamp"); colTypes.add("string"); colFormat.add("%s");
+    colHeaders.add("Duration"); colTypes.add("string"); colFormat.add("%s");
+    colHeaders.add("Evaluation_Iterations"); colTypes.add("int"); colFormat.add("%d");
+    colHeaders.add("Training RMSE"); colTypes.add("double"); colFormat.add("%.5f");
+    setColHeader(colHeaders, colTypes, colFormat, modelCategory, isClassifier, "Training");
+    if (hasValidation)
+      setColHeader(colHeaders, colTypes, colFormat, modelCategory, isClassifier, "Validation");
+    if (hasCrossValidation)
+      setColHeader(colHeaders, colTypes, colFormat, modelCategory, isClassifier, "Cross-Validation");
+ 
+    final int rows = glmOutput._scored_train == null ? 0 : glmOutput._scored_train.size();
+    String[] s = new String[0];
+    TwoDimTable table = new TwoDimTable(
+            "Scoring History", null,
+            new String[rows],
+            colHeaders.toArray(s),
+            colTypes.toArray(s),
+            colFormat.toArray(s),
+            "");
+    int row = 0;
+    if (null == glmOutput._scored_train)
+      return table;
+    int iteration = 0;
+    for (ScoreKeeper si : glmOutput._scored_train) { // fill out the table
+      int col = 0;
+      assert (row < table.getRowDim());
+      assert (col < table.getColDim());
+      DateTimeFormatter fmt = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss");
+      long training_time_ms = glmOutput._training_time_ms.get(row);
+      table.set(row, col++, fmt.print(training_time_ms));
+      table.set(row, col++, PrettyPrint.msecs(training_time_ms-glmOutput._start_time, true));
+      table.set(row, col++, iteration);
+      col = setTableEntry(table, si, row, col, modelCategory, isClassifier); // entry for training dataset
+      if (hasValidation)
+        col = setTableEntry(table, glmOutput._scored_valid.get(row), row, col, modelCategory, isClassifier);
+      if (hasCrossValidation)
+        col = setTableEntry(table, glmOutput._scored_xval.get(row), row, col, modelCategory, isClassifier);
+      row++;
+    }
+    return table;
+  }
+
+  public static void setColHeader(List<String> colHeaders, List<String> colTypes, List<String> colFormat, 
+                                  ModelCategory modelCategory, boolean isClassifier, String metricType) {
+    colHeaders.add(metricType+" RMSE"); colTypes.add("double"); colFormat.add("%.5f");
+    if (modelCategory == ModelCategory.Regression) {
+      colHeaders.add(metricType+" Deviance"); colTypes.add("double"); colFormat.add("%.5f");
+      colHeaders.add(metricType+" MAE"); colTypes.add("double"); colFormat.add("%.5f");
+      colHeaders.add(metricType+" r2"); colTypes.add("double"); colFormat.add("%.5f");
+    }
+    if (isClassifier) {
+      colHeaders.add(metricType+" LogLoss"); colTypes.add("double"); colFormat.add("%.5f");
+      colHeaders.add(metricType+" r2"); colTypes.add("double"); colFormat.add("%.5f");
+    }
+    if (modelCategory == ModelCategory.Binomial) {
+      colHeaders.add(metricType+" AUC"); colTypes.add("double"); colFormat.add("%.5f");
+      colHeaders.add(metricType+" pr_auc"); colTypes.add("double"); colFormat.add("%.5f");
+      colHeaders.add(metricType+" Lift"); colTypes.add("double"); colFormat.add("%.5f");
+    }
+    if (isClassifier) {
+      colHeaders.add(metricType+" Classification Error"); colTypes.add("double"); colFormat.add("%.5f");
+    }
+  }
+  
+  public static int setTableEntry(TwoDimTable table, ScoreKeeper scored_metric, int row, int col,
+                                  ModelCategory modelCategory, boolean isClassifier) {
+    table.set(row, col++, scored_metric != null ? scored_metric._rmse : Double.NaN);
+    if (modelCategory == ModelCategory.Regression) {
+      table.set(row, col++, scored_metric != null ? scored_metric._mean_residual_deviance : Double.NaN);
+      table.set(row, col++, scored_metric != null ? scored_metric._mae : Double.NaN);
+      table.set(row, col++, scored_metric != null ? scored_metric._r2 : Double.NaN);
+    }
+    if (isClassifier) {
+      table.set(row, col++, scored_metric != null ? scored_metric._logloss : Double.NaN);
+      table.set(row, col++, scored_metric != null ? scored_metric._r2 : Double.NaN);
+    }
+    if (modelCategory == ModelCategory.Binomial) {
+      table.set(row, col++, scored_metric != null ? scored_metric._AUC : Double.NaN);
+      table.set(row, col++, scored_metric != null ? scored_metric._pr_auc : Double.NaN);
+      table.set(row, col++, scored_metric != null ? scored_metric._lift : Double.NaN);
+    }
+    if (isClassifier) {
+      table.set(row, col, scored_metric != null ? scored_metric._classError : Double.NaN);
+    }
+
+    return col;
+  }
 
   public GLMV3.GLMParametersV3 createParametersSchema() { return new GLMV3.GLMParametersV3(); }
   public GLMModelOutputV3 createOutputSchema() { return new GLMModelOutputV3(); }

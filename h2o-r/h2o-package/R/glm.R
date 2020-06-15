@@ -29,6 +29,7 @@
 #' @param random_columns random columns indices for HGLM.
 #' @param ignore_const_cols \code{Logical}. Ignore constant columns. Defaults to TRUE.
 #' @param score_each_iteration \code{Logical}. Whether to score during each iteration of model training. Defaults to FALSE.
+#' @param score_iteration_interval Perform scoring for every score_iteration_interval iterations Defaults to -1.
 #' @param offset_column Offset column. This will be added to the combination of columns before applying the link function.
 #' @param weights_column Column with observation weights. Giving some observation a weight of zero is equivalent to excluding it from
 #'        the dataset; giving an observation a relative weight of 2 is equivalent to repeating that row twice. Negative
@@ -179,6 +180,7 @@ h2o.glm <- function(x,
                     random_columns = NULL,
                     ignore_const_cols = TRUE,
                     score_each_iteration = FALSE,
+                    score_iteration_interval = -1,
                     offset_column = NULL,
                     weights_column = NULL,
                     family = c("gaussian", "binomial", "fractionalbinomial", "quasibinomial", "ordinal", "multinomial", "poisson", "gamma", "tweedie", "negativebinomial"),
@@ -289,6 +291,8 @@ h2o.glm <- function(x,
     parms$ignore_const_cols <- ignore_const_cols
   if (!missing(score_each_iteration))
     parms$score_each_iteration <- score_each_iteration
+  if (!missing(score_iteration_interval))
+    parms$score_iteration_interval <- score_iteration_interval
   if (!missing(offset_column))
     parms$offset_column <- offset_column
   if (!missing(weights_column))
@@ -417,6 +421,7 @@ h2o.glm <- function(x,
                                     random_columns = NULL,
                                     ignore_const_cols = TRUE,
                                     score_each_iteration = FALSE,
+                                    score_iteration_interval = -1,
                                     offset_column = NULL,
                                     weights_column = NULL,
                                     family = c("gaussian", "binomial", "fractionalbinomial", "quasibinomial", "ordinal", "multinomial", "poisson", "gamma", "tweedie", "negativebinomial"),
@@ -532,6 +537,8 @@ h2o.glm <- function(x,
     parms$ignore_const_cols <- ignore_const_cols
   if (!missing(score_each_iteration))
     parms$score_each_iteration <- score_each_iteration
+  if (!missing(score_iteration_interval))
+    parms$score_iteration_interval <- score_iteration_interval
   if (!missing(offset_column))
     parms$offset_column <- offset_column
   if (!missing(weights_column))

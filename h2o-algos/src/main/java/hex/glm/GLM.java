@@ -2012,7 +2012,10 @@ public class GLM extends ModelBuilder<GLMModel,GLMParameters,GLMOutput> {
       _model._output._scoring_history = _parms._lambda_search?_lsc.to2dTable():(_parms._HGLM?_sc.to2dTableHGLM():_sc.to2dTable());
       if (!(mtrain == null)) {
         _model._output._training_metrics = mtrain;
-        _model._output._scored_train[_model._output._scoring_history.getRowDim()].fillFrom(mtrain);
+        _model._output._training_time_ms.add(System.currentTimeMillis()); // remember training time
+        ScoreKeeper trainScore = new ScoreKeeper(Double.NaN);
+        trainScore.fillFrom(mtrain);
+        _model._output._scored_train.add(trainScore);
         Log.info(LogMsg(mtrain.toString()));
       } else {
         Log.info(LogMsg("ModelMetrics mtrain is null"));
@@ -2022,9 +2025,11 @@ public class GLM extends ModelBuilder<GLMModel,GLMParameters,GLMOutput> {
         Frame valid = DKV.<Frame>getGet(_parms._valid);
         _model.score(valid).delete();
         _model._output._validation_metrics = ModelMetrics.getFromDKV(_model, valid); //updated by model.scoreAndUpdateModel
-        _model._output._scored_valid[_model._output._scoring_history.getRowDim()].fillFrom(_model._output._validation_metrics);
+        ScoreKeeper validScore = new ScoreKeeper(Double.NaN);
+        validScore.fillFrom(_model._output._validation_metrics);
+        _model._output._scored_train.add(validScore);
       }
-
+      // todo: add scored_xval
       _model.update(_job._key);
       if (_parms._HGLM)
         _model.generateSummaryHGLM(_parms._train,_state._iter);
@@ -2313,20 +2318,14 @@ public class GLM extends ModelBuilder<GLMModel,GLMParameters,GLMOutput> {
                                   double[] VC1, double[][] VC2, double sumDiff2, double convergence, boolean canScore,
                                   double[][] cholR, Frame augXZ) {
       _sc.addIterationScore(_state._iter, _state._sumEtaSquareConvergence);
-      if(canScore && (_parms._score_each_iteration || timeSinceLastScoring() > _scoringInterval)) {
+      if(canScore && (_parms._score_each_iteration || timeSinceLastScoring() > _scoringInterval || 
+              ((_parms._score_iteration_interval > 0) && ((_state._iter % _parms._score_iteration_interval) == 0)))) {
         _model.update(_state.expandBeta(_state.beta()), _state.ubeta(),-1, -1, _state._iter);
         scoreAndUpdateModelHGLM(fixedModel, randModels, glmmmeReturns, hvDataOnly, VC1, VC2, sumDiff2, convergence, 
                 cholR, augXZ, false);
         _earlyStop = !_earlyStop?ScoreKeeper.stopEarly(_model._output.scoreKeepers(),
                 _parms._stopping_rounds, ScoreKeeper.ProblemType.forSupervised(_nclass > 1), _parms._stopping_metric,
                 _parms._stopping_tolerance, "model's last", true):_earlyStop;
-        if (!_earlyStop) {
-          _model._output._scored_train = ArrayUtils.copyAndFillOf(_model._output._scored_train,
-                  _model._output._scoring_history.getRowDim() + 1, new ScoreKeeper());
-          _model._output._scored_valid = _model._output._scored_valid != null ?
-                  ArrayUtils.copyAndFillOf(_model._output._scored_valid, _model._output._scoring_history.getRowDim() + 1,
-                          new ScoreKeeper()) : null;
-        }
       }
     }
     // update user visible progress

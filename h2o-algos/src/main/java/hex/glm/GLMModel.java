@@ -220,6 +220,7 @@ public class GLMModel extends Model<GLMModel,GLMModel.GLMParameters,GLMModel.GLM
     public double[] _startval;  // for HGLM, initialize fixed and random coefficients (init_u), init_sig_u, init_sig_e
     public boolean _calc_like;
     public int[] _random_columns;
+    public int _score_iteration_interval = -1;
     // Has to be Serializable for backwards compatibility (used to be DeepLearningModel.MissingValuesHandling)
     public Serializable _missing_values_handling = MissingValuesHandling.MeanImputation;
     public double _prior = -1;
@@ -1075,6 +1076,7 @@ public class GLMModel extends Model<GLMModel,GLMModel.GLMParameters,GLMModel.GLM
     public String[] _coefficient_names;
     String[] _random_coefficient_names; // for HGLM
     String[] _random_column_names;
+    public ArrayList<Long> _training_time_ms = new ArrayList<>();
     public int _best_lambda_idx; // lambda which minimizes deviance on validation (if provided) or train (if not)
     public int _lambda_1se = -1; // lambda_best + sd(lambda); only applicable if running lambda search with nfold
     public int _selected_lambda_idx; // lambda which minimizes deviance on validation (if provided) or train (if not)
@@ -1088,12 +1090,12 @@ public class GLMModel extends Model<GLMModel,GLMModel.GLMParameters,GLMModel.GLM
     double [][] _vcov;
     private double _dispersion;
     private boolean _dispersionEstimated;
-    public ScoreKeeper[] _scored_train;
-    public ScoreKeeper[] _scored_valid;
-    public ScoreKeeper[] _scored_xval;
+    public ArrayList<ScoreKeeper> _scored_train;
+    public ArrayList<ScoreKeeper> _scored_valid;
+    public ArrayList<ScoreKeeper> _scored_xval;
     public ScoreKeeper[] scoreKeepers() {
       ArrayList<ScoreKeeper> skl = new ArrayList<>();
-      ScoreKeeper[] ska = _validation_metrics != null ? _scored_valid : (_cross_validation_metrics != null? _scored_xval:_scored_train);
+      ArrayList<ScoreKeeper> ska = _validation_metrics != null ? _scored_valid : (_cross_validation_metrics != null? _scored_xval:_scored_train);
       for (ScoreKeeper sk : ska)
         if (!sk.isEmpty())
           skl.add(sk);
@@ -1195,9 +1197,9 @@ public class GLMModel extends Model<GLMModel,GLMModel.GLMParameters,GLMModel.GLM
       else
         _global_beta=beta;
       _submodels = new Submodel[]{new Submodel(0,beta,-1,Double.NaN,Double.NaN)};
-      _scored_train = new ScoreKeeper[]{new ScoreKeeper(Double.NaN)};
-      _scored_valid = new ScoreKeeper[]{new ScoreKeeper(Double.NaN)};
-      _scored_xval = new ScoreKeeper[]{new ScoreKeeper(Double.NaN)};
+      _scored_train = new ArrayList<ScoreKeeper>();
+      _scored_valid = new ArrayList<ScoreKeeper>();
+      _scored_xval = new ArrayList<ScoreKeeper>();
     }
     
     public GLMOutput() {_isSupervised = true; _nclasses = -1;}
@@ -1249,9 +1251,9 @@ public class GLMModel extends Model<GLMModel,GLMModel.GLMParameters,GLMModel.GLM
       _nclasses = glm.nclasses();
       _multinomial = glm._parms._family == Family.multinomial;
       _ordinal = (glm._parms._family == Family.ordinal);
-      _scored_train = new ScoreKeeper[]{new ScoreKeeper(Double.NaN)};
-      _scored_valid = new ScoreKeeper[]{new ScoreKeeper(Double.NaN)};
-      _scored_xval = new ScoreKeeper[]{new ScoreKeeper(Double.NaN)};
+      _scored_train = new ArrayList<ScoreKeeper>();
+      _scored_valid = new ArrayList<ScoreKeeper>();
+      _scored_xval = new ArrayList<ScoreKeeper>();
     }
 
     /**
