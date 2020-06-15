@@ -14,6 +14,8 @@ public class EffectiveParametersUtils {
         if (params._fold_assignment == Model.Parameters.FoldAssignmentScheme.AUTO) {
             if (params._nfolds > 0 && params._fold_column == null) {
                 params._fold_assignment = Model.Parameters.FoldAssignmentScheme.Random;
+            } else {
+                params._fold_assignment = null;
             }
         }
     }
