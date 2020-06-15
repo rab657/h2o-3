@@ -2035,7 +2035,6 @@ public class DeepLearningTest extends TestUtil {
       parms._seed = 0xdecaf;
       parms._nfolds = 3;
       parms._distribution = bernoulli;
-      parms._categorical_encoding = Model.Parameters.CategoricalEncodingScheme.AUTO;
 
       dl = new DeepLearning(parms).trainModel().get();
 
