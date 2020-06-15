@@ -66,12 +66,12 @@ public class DeepLearningAutoEncoderTest extends TestUtil {
         p._epochs = 13.3;
         p._force_load_balance = true;
         p._elastic_averaging = false;
-        DeepLearningParameters p2 = (DeepLearningParameters) p.clone();
         DeepLearning dl = new DeepLearning(p);
         DeepLearningModel mymodel = dl.trainModel().get();
 
-        p2._standardize = false;
-        DeepLearning dlNoStand = new DeepLearning(p2);
+        p._stopping_metric = ScoreKeeper.StoppingMetric.AUTO; // reset to auto as it got evaluated during previous model building
+        p._standardize = false;
+        DeepLearning dlNoStand = new DeepLearning(p);
         DeepLearningModel mymodelNoStand = dlNoStand.trainModel().get();
 
         Frame l2_frame_train=null, l2_frame_test=null;
