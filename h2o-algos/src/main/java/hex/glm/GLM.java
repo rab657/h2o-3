@@ -64,6 +64,8 @@ public class GLM extends ModelBuilder<GLMModel,GLMParameters,GLMOutput> {
   public String[][] _gamColnames = null;
   public int[][] _gamColIndices = null; // corresponding column indices in dataInfo
   public static int _totalBetaLen;
+  private boolean _calScoreKeeper = false; // true to update scored_train/scored_valid/scored_xval for early stop
+
   public GLM(boolean startup_once){super(new GLMParameters(),startup_once);}
   public GLM(GLMModel.GLMParameters parms) {
     super(parms);
@@ -512,6 +514,8 @@ public class GLM extends ModelBuilder<GLMModel,GLMParameters,GLMOutput> {
         warn("early stop", "disabled when lambda_search=true.");
         _parms._stopping_rounds = 0;  // set stopping_round = 0 to disable early stopping
       }
+      if (!_parms._lambda_search && (_parms._stopping_rounds > 0))  // early stop is on!
+        _calScoreKeeper = true;
       if (_parms._alpha == null)
         _parms._alpha = new double[]{_parms._solver == Solver.L_BFGS ? 0 : .5};
       if (_parms._lambda_search  &&_parms._nlambdas == -1)
@@ -1983,31 +1987,6 @@ public class GLM extends ModelBuilder<GLMModel,GLMParameters,GLMOutput> {
       Frame train = DKV.<Frame>getGet(_parms._train); // need to keep this frame to get scoring metrics back
       _model.score(train).delete();
       scoreEnd(train, t1);
-/*
-        ModelMetrics mtrain = ModelMetrics.getFromDKV(_model, train); // updated by model.scoreAndUpdateModel
-        long t2 = System.currentTimeMillis();
-        if (!(mtrain == null)) {
-          _model._output._training_metrics = mtrain;
-          Log.info(LogMsg(mtrain.toString()));
-        } else {
-          Log.info(LogMsg("ModelMetrics mtrain is null"));
-        }
-        Log.info(LogMsg("Training metrics computed in " + (t2 - t1) + "ms"));
-        if (_valid != null) {
-          Frame valid = DKV.<Frame>getGet(_parms._valid);
-          _model.score(valid).delete();
-          _model._output._validation_metrics = ModelMetrics.getFromDKV(_model, valid); //updated by model.scoreAndUpdateModel
-        }
-      _model._output._scoring_history = _parms._lambda_search?_lsc.to2dTable():(_parms._HGLM?_sc.to2dTableHGLM():_sc.to2dTable());
-      _model.update(_job._key);
-      if (_parms._HGLM)
-        _model.generateSummary(_state._iter, _parms._train);
-      else
-        _model.generateSummary(_parms._train,_state._iter);
-      _lastScore = System.currentTimeMillis();
-      long scoringTime = System.currentTimeMillis() - t1;
-      _scoringInterval = Math.max(_scoringInterval,20*scoringTime); // at most 5% overhead for scoring
-*/
     }
     
     private void scoreEnd(Frame train, long t1) {
@@ -2019,7 +1998,8 @@ public class GLM extends ModelBuilder<GLMModel,GLMParameters,GLMOutput> {
         _model._output._training_time_ms.add(System.currentTimeMillis()); // remember training time
         ScoreKeeper trainScore = new ScoreKeeper(Double.NaN);
         trainScore.fillFrom(mtrain);
-        _model._output._scored_train.add(trainScore);
+        if (_calScoreKeeper && !_earlyStop)
+          _model._output._scored_train.add(trainScore);
         Log.info(LogMsg(mtrain.toString()));
       } else {
         Log.info(LogMsg("ModelMetrics mtrain is null"));
@@ -2031,7 +2011,8 @@ public class GLM extends ModelBuilder<GLMModel,GLMParameters,GLMOutput> {
         _model._output._validation_metrics = ModelMetrics.getFromDKV(_model, valid); //updated by model.scoreAndUpdateModel
         ScoreKeeper validScore = new ScoreKeeper(Double.NaN);
         validScore.fillFrom(_model._output._validation_metrics);
-        _model._output._scored_train.add(validScore);
+        if (_calScoreKeeper && !_earlyStop)
+          _model._output._scored_valid.add(validScore);
       }
       // todo: add scored_xval
       _model.update(_job._key);

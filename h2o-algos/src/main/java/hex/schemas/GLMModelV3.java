@@ -245,8 +245,9 @@ public class GLMModelV3 extends ModelSchemaV3<GLMModel, GLMModelV3, GLMModel.GLM
         standardized_coefficient_magnitudes = new TwoDimTableV3();
         standardized_coefficient_magnitudes.fillFromImpl(tdt);
       }
-      scoring_history_early_stop = createScoringHistoryTable(impl, impl._validation_metrics!=null,
-              impl._cross_validation_metrics != null, impl.getModelCategory());
+      if (impl._scored_train.size() > 0)
+        scoring_history_early_stop = createScoringHistoryTable(impl, impl._validation_metrics!=null, 
+                impl._cross_validation_metrics != null, impl.getModelCategory());
       return this;
     }
   } // GLMModelOutputV2
@@ -292,9 +293,9 @@ public class GLMModelV3 extends ModelSchemaV3<GLMModel, GLMModelV3, GLMModel.GLM
       table.set(row, col++, PrettyPrint.msecs(training_time_ms-glmOutput._start_time, true));
       table.set(row, col++, iteration);
       col = setTableEntry(table, si, row, col, modelCategory, isClassifier); // entry for training dataset
-      if (hasValidation)
+      if (hasValidation && (glmOutput._scored_valid.size() > 0))
         col = setTableEntry(table, glmOutput._scored_valid.get(row), row, col, modelCategory, isClassifier);
-      if (hasCrossValidation)
+      if (hasCrossValidation  && (glmOutput._scored_xval.size() > 0))
         col = setTableEntry(table, glmOutput._scored_xval.get(row), row, col, modelCategory, isClassifier);
       row++;
     }
@@ -303,7 +304,7 @@ public class GLMModelV3 extends ModelSchemaV3<GLMModel, GLMModelV3, GLMModel.GLM
 
   public static void setColHeader(List<String> colHeaders, List<String> colTypes, List<String> colFormat, 
                                   ModelCategory modelCategory, boolean isClassifier, String metricType) {
-    colHeaders.add(metricType+" RMSE"); colTypes.add("double"); colFormat.add("%.5f");
+    colHeaders.add(metricType+"_RMSE"); colTypes.add("double"); colFormat.add("%.5f");
     if (modelCategory == ModelCategory.Regression) {
       colHeaders.add(metricType+" Deviance"); colTypes.add("double"); colFormat.add("%.5f");
       colHeaders.add(metricType+" MAE"); colTypes.add("double"); colFormat.add("%.5f");
