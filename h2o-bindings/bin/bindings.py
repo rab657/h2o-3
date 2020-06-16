@@ -368,9 +368,9 @@ def schemas_map(add_generics=False):
             # Write the generic information about the base class
             schema = m[base]
             schema["generics"] = generics
-            generic_map = DictList()
+            generic_map = defaultdict(list)
             for name, schema_name in generics:
-                generic_map[schema_name] = name       
+                generic_map[schema_name].append(name)     
             generic_index = {geninfo[0]: i for i, geninfo in enumerate(generics)}
             mapped_fields = {}
             for field in schema["fields"]:
@@ -518,12 +518,3 @@ def _report_time():
     if config["start_time"]:
         print("done (in %.3fs)" % (time.time() - config["start_time"]))
 
-
-
-class DictList(dict):
-    def __setitem__(self, key, value):
-        try:
-            self[key]
-        except KeyError:
-            super(DictList, self).__setitem__(key, [])
-        self[key].append(value)
