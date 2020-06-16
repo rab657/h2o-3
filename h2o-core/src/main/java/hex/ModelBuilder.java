@@ -349,12 +349,12 @@ abstract public class ModelBuilder<M extends Model<M,P,O>, P extends Model.Param
       _job = (Job<Model>) _mb._job;
       _key = _job._result;
       _parms = _mb._parms;
+      _mb._input_parms = _parms.clone();
     }
     @Override
     public void setupOnRemote() {
       _mb = ModelBuilder.make(_parms.algoName(), _job, _key);
       _mb._parms = _parms;
-      _mb._input_parms = _parms.clone();
       _mb.init(false); // validate parameters
     }
     @Override
